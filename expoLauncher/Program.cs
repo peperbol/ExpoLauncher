@@ -17,6 +17,7 @@ namespace expoLauncher {
         private static extern short GetAsyncKeyState(int vKey);
         private static readonly int VK_F5 = 0x74; // https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
         private static readonly int VK_F6 = 0x75;
+        private static readonly int VK_NUMPAD0 = 0x60;
 
         private class Config {
             public bool isBrowser = true;
@@ -61,7 +62,7 @@ namespace expoLauncher {
         }
 
         public static bool IsF5Pressed() {
-            return ((GetAsyncKeyState(VK_F5) >> 15) & 0x0001) == 0x0001;
+            return ((GetAsyncKeyState(VK_F5) >> 15) & 0x0001) == 0x0001 || ((GetAsyncKeyState(VK_NUMPAD0) >> 15) & 0x0001) == 0x0001;
         }
         
         public static bool IsF6Pressed() {
