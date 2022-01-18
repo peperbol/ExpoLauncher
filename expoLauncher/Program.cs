@@ -91,12 +91,25 @@ namespace expoLauncher {
 
             using var process = Process.Start(startInfo);
 
-            bool closing = false;
+            var name = process.ProcessName;
             
             while (IsF5Pressed()) { //wait for unpress
                 await Task.Delay(10);
             }
+
+            await WaitToClose(process);
+
+            var relaunched = Process.GetProcessesByName(name);
+            if (relaunched.Length > 0) {
+                Console.WriteLine("waiting for relaunch");
+                await WaitToClose(relaunched[0]);
+            }
+            Console.WriteLine("done " + name);
+        }
+
+        public static async Task WaitToClose(Process process) {
             
+            bool closing = false;
             while (process != null && !process.HasExited ) {
                 if ((IsF5Pressed() || IsF6Pressed())&& !closing) {
                     process.Kill();
@@ -105,8 +118,8 @@ namespace expoLauncher {
 
                 await Task.Delay(10);
             }
-            Console.WriteLine("done");
         }
+
         public static async Task StartBrowserProcess(string chromeExe) {
             foreach (var p in Process.GetProcessesByName("chrome"))
             {
