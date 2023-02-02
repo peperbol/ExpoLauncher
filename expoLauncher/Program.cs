@@ -13,6 +13,21 @@ using Newtonsoft.Json;
 
 namespace expoLauncher {
     class Program {
+        [DllImport("xinput1_3.dll", EntryPoint = "#100")]
+        static extern int secret_get_gamepad(int playerIndex, out XINPUT_GAMEPAD_SECRET struc);
+
+        public struct XINPUT_GAMEPAD_SECRET
+        {
+            public UInt32 eventCount;
+            public ushort wButtons;
+            public Byte bLeftTrigger;
+            public Byte bRightTrigger;
+            public short sThumbLX;
+            public short sThumbLY;
+            public short sThumbRX;
+            public short sThumbRY;
+        }
+        
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int vKey);
         private static readonly int VK_F5 = 0x74; // https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
@@ -62,12 +77,18 @@ namespace expoLauncher {
         }
 
         public static bool IsF5Pressed() {
+            XINPUT_GAMEPAD_SECRET state; 
+            for (int i = 0; i < 4; i++) {
+                secret_get_gamepad(i, out state);
+                if((state.wButtons & 0x0400) != 0) return true;
+            }
             return ((GetAsyncKeyState(VK_F5) >> 15) & 0x0001) == 0x0001 || ((GetAsyncKeyState(VK_NUMPAD0) >> 15) & 0x0001) == 0x0001;
         }
         
         public static bool IsF6Pressed() {
             return ((GetAsyncKeyState(VK_F6) >> 15) & 0x0001) == 0x0001;
         }
+        
         public static void Cleanup(string[] directoryPaths) {
             foreach (var directoryPath in directoryPaths) {
                 if (string.IsNullOrEmpty(directoryPath)) continue;
@@ -93,6 +114,10 @@ namespace expoLauncher {
             using var process = Process.Start(startInfo);
 
             var name = process.ProcessName;
+            if (!IsF5Pressed()) {
+                Console.WriteLine("wait");
+                await Task.Delay(1000);
+            }
             
             while (IsF5Pressed()) { //wait for unpress
                 await Task.Delay(10);
