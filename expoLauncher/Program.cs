@@ -92,9 +92,10 @@ namespace expoLauncher {
         public static void Cleanup(string[] directoryPaths) {
             foreach (var directoryPath in directoryPaths) {
                 if (string.IsNullOrEmpty(directoryPath)) continue;
-                if(!Directory.Exists(directoryPath)) continue;
+                var path = Environment.ExpandEnvironmentVariables(directoryPath);
+                if(!Directory.Exists(path)) continue;
 
-                System.IO.DirectoryInfo di = new DirectoryInfo(directoryPath);
+                System.IO.DirectoryInfo di = new DirectoryInfo(path);
 
                 foreach (FileInfo file in di.GetFiles())
                 {
@@ -115,7 +116,6 @@ namespace expoLauncher {
 
             var name = process.ProcessName;
             if (!IsF5Pressed()) {
-                Console.WriteLine("wait");
                 await Task.Delay(1000);
             }
             
@@ -124,7 +124,7 @@ namespace expoLauncher {
             }
 
             await WaitToClose(process);
-
+Debug.WriteLine("1");
             var relaunched = Process.GetProcessesByName(name);
             if (relaunched.Length > 0) {
                 Console.WriteLine("waiting for relaunch");
