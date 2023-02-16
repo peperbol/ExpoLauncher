@@ -130,6 +130,14 @@ Debug.WriteLine("1");
                 Console.WriteLine("waiting for relaunch");
                 await WaitToClose(relaunched[0]);
             }
+            
+            Console.WriteLine("closing");
+
+            //kill all to be sure
+            foreach (var p in Process.GetProcessesByName(name)) {
+                p.Kill();
+            }
+            
             Console.WriteLine("done " + name);
         }
 
