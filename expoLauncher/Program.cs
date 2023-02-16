@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -9,12 +11,14 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Win32;
 using Newtonsoft.Json;
 
 namespace expoLauncher {
     class Program {
         [DllImport("xinput1_3.dll", EntryPoint = "#100")]
         static extern int secret_get_gamepad(int playerIndex, out XINPUT_GAMEPAD_SECRET struc);
+        
 
         public struct XINPUT_GAMEPAD_SECRET
         {
@@ -35,18 +39,35 @@ namespace expoLauncher {
         private static readonly int VK_NUMPAD0 = 0x60;
 
         private class Config {
-            public bool isBrowser = true;
-            public string path = "D:\\itchGames\\coming-out-simulator-2014";
+            public bool isBrowser = false;
+            public bool isSteam = false;
+            public string path = "notepad.exe";
+            public string processToClose = "";
+            public int steamId = 95400;
             public string chrome = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe";
-            public string args = "-screen-fullscreen";
+            public string args = "";
             public string[] clearFolders = new String[0];
         }
-        
+
+        public static int GetSteamApp() {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Valve\Steam"))
+            {
+                if (key != null)
+                {
+                    Object o = key.GetValue("RunningAppID");
+                    return (int)o;
+                }
+            }
+
+            return 0;
+        }
         static async Task Main(string[] args) {
             var config = GetConfig();
             if (config.isBrowser) {
                 await StartBrowserApp(config);
-            } else {
+            } else if (config.isSteam) {
+                await StartSteam(config);
+            }else {
                 await StartExe(config);
             }
         }
@@ -72,7 +93,14 @@ namespace expoLauncher {
         static async Task StartExe(Config config) {
             do {
                 Cleanup(config.clearFolders);
-                await StartProcess(config.path, config.args);
+                await StartProcess(config.path, config.args, config.processToClose);
+            } while (!IsF6Pressed());
+        }
+        static async Task StartSteam(Config config) {
+            if (string.IsNullOrEmpty(config.processToClose)) config.processToClose = config.path;
+            do {
+                Cleanup(config.clearFolders);
+                await StartSteamGame(config.steamId, config.processToClose);
             } while (!IsF6Pressed());
         }
 
@@ -108,13 +136,49 @@ namespace expoLauncher {
             }
         }
 
-        public static async Task StartProcess(string exe, string args) {
+        public static async Task StartSteamGame(int id, string processName) {
+            ProcessStartInfo startInfo = new ProcessStartInfo("cmd", $"/c start steam://rungameid/"+id);
+            using var process = Process.Start(startInfo);
+            
+            Console.WriteLine("launching");
+            while (GetSteamApp() != id) {
+                await Task.Delay(50);
+            }
+            Console.WriteLine("launched ");
+            await WaitToClose(id, processName);
+        }
+        
+        public static async Task WaitToClose(int steamID, string processName) {
+            bool closing = false;
+            while (GetSteamApp() == steamID ) {
+                if ((IsF5Pressed() || IsF6Pressed())&& !closing) {
+                    Console.WriteLine("shouldQuit ");
+                    Process[] procs = Process.GetProcesses();
+
+                    try {
+                        Process process = procs.First(x => x.ProcessName == processName);
+                        process.Kill();
+                    } catch (Exception e) {
+                        Console.WriteLine($"COULD NOT FIND PROCESS {processName}\n running:");
+                        foreach (var p in procs) {
+                            Console.WriteLine($"{p.ProcessName} {p.Id} ");
+                        }
+                        throw;
+                    }
+                    closing = true;
+                }
+
+                await Task.Delay(10);
+            }
+        }
+
+        public static async Task StartProcess(string exe, string args, string processToClose) {
 
             ProcessStartInfo startInfo = new ProcessStartInfo(exe, args);
-
+            startInfo.WorkingDirectory = Path.GetDirectoryName(exe);
             using var process = Process.Start(startInfo);
 
-            var name = process.ProcessName;
+            if(string.IsNullOrEmpty(processToClose)) processToClose = process.ProcessName;
             if (!IsF5Pressed()) {
                 await Task.Delay(1000);
             }
@@ -125,7 +189,7 @@ namespace expoLauncher {
 
             await WaitToClose(process);
 Debug.WriteLine("1");
-            var relaunched = Process.GetProcessesByName(name);
+            var relaunched = Process.GetProcessesByName(processToClose);
             if (relaunched.Length > 0) {
                 Console.WriteLine("waiting for relaunch");
                 await WaitToClose(relaunched[0]);
@@ -138,11 +202,10 @@ Debug.WriteLine("1");
                 p.Kill();
             }
             
-            Console.WriteLine("done " + name);
+            Console.WriteLine("done " + processToClose);
         }
 
         public static async Task WaitToClose(Process process) {
-            
             bool closing = false;
             while (process != null && !process.HasExited ) {
                 if ((IsF5Pressed() || IsF6Pressed())&& !closing) {
