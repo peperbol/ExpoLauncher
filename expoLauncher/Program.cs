@@ -198,7 +198,7 @@ Debug.WriteLine("1");
             Console.WriteLine("closing");
 
             //kill all to be sure
-            foreach (var p in Process.GetProcessesByName(name)) {
+            foreach (var p in Process.GetProcessesByName(processToClose)) {
                 p.Kill();
             }
             
